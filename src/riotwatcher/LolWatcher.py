@@ -1,4 +1,6 @@
+import logging
 from typing import Union
+
 from .Deserializer import Deserializer
 from .RateLimiter import RateLimiter
 
@@ -7,6 +9,7 @@ from .Handlers import (
     DeserializerAdapter,
     DictionaryDeserializer,
     RateLimiterAdapter,
+    SanitationHandler,
     ThrowOnErrorHandler,
     TypeCorrectorHandler,
 )
@@ -22,17 +25,18 @@ from ._apis.league_of_legends import (
     LeagueApiV4,
     LolStatusApiV3,
     LolStatusApiV4,
-    MatchApiV4,
     SpectatorApiV4,
     SummonerApiV4,
     MatchApiV5,
-    ThirdPartyCodeApiV4,
 )
+
+LOG = logging.getLogger(__name__)
 
 
 class LolWatcher:
     """
-    LolWatcher class is intended to be the main interaction point with the APIs for League of Legends.
+    LolWatcher class is intended to be the main interaction point with the APIs for
+    League of Legends.
     """
 
     def __init__(
@@ -42,29 +46,34 @@ class LolWatcher:
         kernel_url: str = None,
         rate_limiter: RateLimiter = BasicRateLimiter(),
         deserializer: Deserializer = DictionaryDeserializer(),
-        default_match_v5: bool = False,
         default_status_v4: bool = False,
+        **kwargs,
     ):
         """
         Initialize a new instance of the RiotWatcher class.
 
         :param string api_key: the API key to use for this instance
-        :param int timeout: Time to wait for a response before timing out a connection to
-                            the Riot API
-        :param string kernel_url: URL for the kernel instance to connect to, instead of the API.
-                                  See https://github.com/meraki-analytics/kernel for details.
+        :param int timeout: Time to wait for a response before timing out a connection
+                            to the Riot API
+        :param string kernel_url: URL for the kernel instance to connect to, instead of
+                                  the API. See
+                                  https://github.com/meraki-analytics/kernel for
+                                  details.
         :param RateLimiter rate_limiter: Instance to be used for rate limiting.
-                                         This defaults to Handlers.RateLimit.BasicRateLimiter.
-                                         This parameter is not used when connecting to a
-                                         kernel instance.
+                                         This defaults to
+                                         Handlers.RateLimit.BasicRateLimiter.
+                                         This parameter is not used when connecting to
+                                         a kernel instance.
         :param Deserializer deserializer: Instance to be used to deserialize responses
-                                          from the Riot Api. Default is Handlers.DictionaryDeserializer.
+                                          from the Riot Api. Default is
+                                          Handlers.DictionaryDeserializer.
         """
         if not kernel_url and not api_key:
             raise ValueError("Either api_key or kernel_url must be set!")
 
         if kernel_url:
             handler_chain = [
+                SanitationHandler(),
                 DeserializerAdapter(deserializer),
                 ThrowOnErrorHandler(),
                 TypeCorrectorHandler(),
@@ -72,6 +81,7 @@ class LolWatcher:
             ]
         else:
             handler_chain = [
+                SanitationHandler(),
                 DeserializerAdapter(deserializer),
                 ThrowOnErrorHandler(),
                 TypeCorrectorHandler(),
@@ -93,18 +103,20 @@ class LolWatcher:
         self._clash = ClashApiV1(self._base_api)
         self._champion_mastery = ChampionMasteryApiV4(self._base_api)
         self._league = LeagueApiV4(self._base_api)
-        self._match_v4 = MatchApiV4(self._base_api)
-        self._match_v5 = MatchApiV5(self._base_api)
+        self._match = MatchApiV5(self._base_api)
         self._spectator = SpectatorApiV4(self._base_api)
         self._summoner = SummonerApiV4(self._base_api)
-        self._third_party_code = ThirdPartyCodeApiV4(self._base_api)
 
-        self._match = self._match_v5 if default_match_v5 else self._match_v4
         self._lol_status = (
             self._lol_status_v4 if default_status_v4 else self._lol_status_v3
         )
         # todo: tournament-stub
         # todo: tournament
+
+        if "default_match_v5" in kwargs:
+            LOG.warning(
+                "property 'default_match_v5' has been deprecated and can be removed"
+            )
 
     @property
     def champion_mastery(self) -> ChampionMasteryApiV4:
@@ -170,7 +182,7 @@ class LolWatcher:
         return self._lol_status_v4
 
     @property
-    def match(self) -> Union[MatchApiV4, MatchApiV5]:
+    def match(self) -> MatchApiV5:
         """
         Interface to the Match Endpoint
 
@@ -179,24 +191,22 @@ class LolWatcher:
         return self._match
 
     @property
-    def match_v4(self) -> MatchApiV4:
+    def match_v4(self):
         """
-        Temporary explicit interface to match-v4 endpoint.
-        Will be removed when matchv4 is deprecated.
-
-        :rtype: league_of_legends.MatchApiV4
+        This property has been deprecated. Use 'match' property instead.
+        Note that v4 is now permanently removed by Riot
         """
-        return self._match
+        raise NotImplementedError(
+            "this property has been deprecated. Use 'match' property instead. Note "
+            + "that v4 is now permanently removed by Riot"
+        )
 
     @property
-    def match_v5(self) -> MatchApiV5:
-        """
-        Temporary explicit interface to match-v5 endpoint.
-        Will be removed when matchv4 is deprecated.
-
-        :rtype: league_of_legends.MatchApiV5
-        """
-        return self._match_v5
+    def match_v5(self):
+        """this property has been deprecated. Use 'match' property instead."""
+        raise NotImplementedError(
+            "this property has been deprecated. Use 'match' property instead."
+        )
 
     @property
     def spectator(self) -> SpectatorApiV4:
@@ -226,10 +236,11 @@ class LolWatcher:
         return self._summoner
 
     @property
-    def third_party_code(self) -> ThirdPartyCodeApiV4:
+    def third_party_code(self) -> None:
         """
-        Interface to the Third Party Code Endpoint
+        DEPRECATED: API has been removed by Riot
+        """
+        raise NotImplementedError(
+            "API has been removed by Riot and no longer functions"
+        )
 
-        :rtype: league_of_legends.ThirdPartyCodeApiV4
-        """
-        return self._third_party_code

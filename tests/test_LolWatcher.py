@@ -1,9 +1,7 @@
 import pytest
 
-from riotwatcher import LolWatcher
+from riotwatcher import LolWatcher, IllegalArgumentError
 from riotwatcher._apis.league_of_legends import (
-    MatchApiV4,
-    MatchApiV5,
     LolStatusApiV3,
     LolStatusApiV4,
 )
@@ -25,18 +23,6 @@ class TestLolWatcher:
     def test_allows_kernel_url(self):
         LolWatcher(kernel_url="https://fake-kernel-server")
 
-    def test_defaults_match_v4(self):
-        watcher = LolWatcher(api_key="RGAPI-this-is-a-fake")
-        assert isinstance(watcher.match, MatchApiV4)
-
-    def test_uses_match_v4_when_false(self):
-        watcher = LolWatcher(api_key="RGAPI-this-is-a-fake", default_match_v5=False)
-        assert isinstance(watcher.match, MatchApiV4)
-
-    def test_uses_match_v5_when_true(self):
-        watcher = LolWatcher(api_key="RGAPI-this-is-a-fake", default_match_v5=True)
-        assert isinstance(watcher.match, MatchApiV5)
-
     def test_defaults_status_v3(self):
         watcher = LolWatcher(api_key="RGAPI-this-is-a-fake")
         assert isinstance(watcher.lol_status, LolStatusApiV3)
@@ -48,3 +34,8 @@ class TestLolWatcher:
     def test_uses_status_v4_when_true(self):
         watcher = LolWatcher(api_key="RGAPI-this-is-a-fake", default_status_v4=True)
         assert isinstance(watcher.lol_status, LolStatusApiV4)
+
+    def test_stealing_api_key_doesnt_work(self):
+        watcher = LolWatcher(api_key="RGAPI-this-is-a-fake")
+        with pytest.raises(IllegalArgumentError):
+            watcher.lol_status.shard_data("example.com/?stolen-request=")
